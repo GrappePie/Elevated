@@ -27,28 +27,26 @@
 ---Made by @m1rrun---
 ---Special thanks: @VioletElementalist---
 
-local F = script.Parent  -- <-- if modules are siblings of this file. If they are children, use `local F = script`.
-
 -- Core
-local timer          = require(F:WaitForChild("Timer"))
-local maid           = require(F:WaitForChild("Maid"))
-local tween          = require(F:WaitForChild("Tween"))
-local anim           = require(F:WaitForChild("Animation"))
+local timer          = require(script.Timer)
+local maid           = require(script.Maid)
+local tween          = require(script.Tween)
+local anim           = require(script.Animation)
 
 -- Flow / control
-local debounce       = require(F:WaitForChild("Debounce"))
-local ratelimiterMod = require(F:WaitForChild("RateLimiter"))
-local randomweighted = require(F:WaitForChild("RandomWeighted"))
-local timeline       = require(F:WaitForChild("Timeline"))
-local seededrng      = require(F:WaitForChild("SeededRng"))
+local debounce       = require(script.Debounce)
+local ratelimiterMod = require(script.RateLimiter)
+local randomweighted = require(script.RandomWeighted)
+local timeline       = require(script.Timeline)
+local seededrng      = require(script.SeededRng)
 
 -- AI / gameplay
-local blackboardMod  = require(F:WaitForChild("Blackboard"))
-local fsmMod         = require(F:WaitForChild("FSM"))
-local perception     = require(F:WaitForChild("Perception"))
-local directorMod    = require(F:WaitForChild("Director"))
-local objectpoolMod  = require(F:WaitForChild("ObjectPool"))
-local objectiveMgr   = require(F:WaitForChild("ObjectiveManager"))
+local blackboardMod  = require(script.Blackboard)
+local fsmMod         = require(script.FSM)
+local perception     = require(script.Perception)
+local directorMod    = require(script.Director)
+local objectpoolMod  = require(script.ObjectPool)
+local objectiveMgr   = require(script.ObjectiveManager)
 
 
 local api = {}
