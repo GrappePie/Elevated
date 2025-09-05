@@ -62,16 +62,25 @@ local function randIndex(rng: Random?, n: number): number
 	return math.random(1, n)
 end
 
-function MapBuilder.Generate(themeName: string, seed: number?)
-	-- Record active map profile
-	GameStateManager.SetActiveMapType(themeName)
+-- Track generated monsters for cleanup between map rebuilds
+local monsterMaid
 
-	-- Remove AI spawned by previous map
-	for _, obj in ipairs(Workspace:GetChildren()) do
-		if obj:IsA("Model") and obj:GetAttribute("MonsterAI") then
-			obj:Destroy()
-		end
-	end
+function MapBuilder.Generate(themeName: string, seed: number?)
+        -- Record active map profile
+        GameStateManager.SetActiveMapType(themeName)
+
+        -- Destroy any previously spawned monster
+        if monsterMaid then
+                monsterMaid:Destroy()
+                monsterMaid = nil
+        end
+
+        -- Remove AI spawned by previous map (fallback)
+        for _, obj in ipairs(Workspace:GetChildren()) do
+                if obj:IsA("Model") and obj:GetAttribute("MonsterAI") then
+                        obj:Destroy()
+                end
+        end
 
 	-- Remove previous map container
 	local oldMap = Workspace:FindFirstChild("GeneratedMap")
@@ -100,13 +109,99 @@ function MapBuilder.Generate(themeName: string, seed: number?)
 		pcall(GameStateManager.SetFloorSeed, floorSeed)
 	end
 
-	local rng = Random.new(floorSeed)
+        local rng = Random.new(floorSeed)
 
-	-- Optionally (data-driven) register objectives for this floor via Utils facade
-	do
-		local objectivesDef = config.generation and config.generation.objectives
-		if Utils and Utils.objectives and objectivesDef then
-			local ObjectiveManager = Utils:objectives()
+        local function spawnMonster(mapLayout, config)
+                local monsterTemplates = ReplicatedStorage:FindFirstChild("MonsterTemplates")
+                if not monsterTemplates then
+                        warn("[MonsterAI] MonsterTemplates folder not found in ReplicatedStorage.")
+                        return
+                end
+
+                -- collect valid pieces (exclude Rooms and the first piece)
+                local validPieces = {}
+                for _, piece in ipairs(mapLayout) do
+                        if piece.type ~= "Room" then
+                                table.insert(validPieces, piece)
+                        end
+                end
+                if #mapLayout > 0 then
+                        local firstPiece = mapLayout[1]
+                        for i = #validPieces, 1, -1 do
+                                if validPieces[i] == firstPiece then
+                                        table.remove(validPieces, i)
+                                end
+                        end
+                end
+
+                if #validPieces == 0 then
+                        warn("[MonsterAI] No valid piece found to spawn monster (not Room, not initial).")
+                        return
+                end
+
+                local chosenPiece = validPieces[randIndex(rng, #validPieces)]
+                local sizeInCells = Vector2.new(3, 3)
+
+                -- Find floor Y (if the piece model has a part named "Floor"/"Suelo")
+                local baseY = 0
+                if chosenPiece.model and chosenPiece.model:IsA("Model") then
+                        for _, part in ipairs(chosenPiece.model:GetDescendants()) do
+                                if part:IsA("BasePart") then
+                                        local lname = part.Name:lower()
+                                        if lname:find("floor") or lname:find("suelo") then
+                                                baseY = part.Position.Y + (part.Size.Y / 2)
+                                                break
+                                        end
+                                end
+                        end
+                end
+                if baseY == 0 then
+                        baseY = config.construction.ALTURA_PISO or 1
+                end
+
+                local spawnPos = Vector3.new(
+                        ((chosenPiece.pos.c - 1) * sizeInCells.X + (sizeInCells.X / 2)) * config.construction.CELL_SIZE,
+                        baseY + 3,
+                        ((chosenPiece.pos.r - 1) * sizeInCells.Y + (sizeInCells.Y / 2)) * config.construction.CELL_SIZE
+                )
+                local monsterTemplate = monsterTemplates:FindFirstChild("HallwayMonster")
+                        or monsterTemplates:FindFirstChildOfClass("Model")
+                if not monsterTemplate then
+                        warn("[MonsterAI] No template under ReplicatedStorage/MonsterTemplates.")
+                        return
+                end
+
+                local monster = monsterTemplate:Clone()
+                monster.Name = ("Monster_%d"):format(rng:NextInteger(1000, 9999))
+                if not monster:GetAttribute("MonsterType") then
+                        monster:SetAttribute("MonsterType", "Hallway")
+                end
+                monster:SetAttribute("MonsterAI", true)
+
+                local root = monster:FindFirstChild("HumanoidRootPart")
+                        or monster.PrimaryPart
+                        or monster:FindFirstChildWhichIsA("BasePart")
+                if not root then
+                        warn("[MonsterAI] No HumanoidRootPart/PrimaryPart found in monster template.")
+                        monster:Destroy()
+                        return
+                end
+
+                monster.Parent = Workspace
+                monster:SetPrimaryPartCFrame(CFrame.new(spawnPos + Vector3.new(0, 5, 0)))
+                print(("[MonsterAI] Spawned %s @ %s"):format(monster.Name, tostring(spawnPos)))
+
+                if Utils and Utils.maid then
+                        monsterMaid = Utils:maid(true)
+                        monsterMaid:GiveInstance(monster)
+                end
+        end
+
+        -- Optionally (data-driven) register objectives for this floor via Utils facade
+        do
+                local objectivesDef = config.generation and config.generation.objectives
+                if Utils and Utils.objectives and objectivesDef then
+                        local ObjectiveManager = Utils:objectives()
 			if ObjectiveManager then
 				if ObjectiveManager.reset then
 					pcall(function() ObjectiveManager:reset() end)
@@ -211,84 +306,8 @@ function MapBuilder.Generate(themeName: string, seed: number?)
 			recipe.model = pieceModel
 		end
 
-		-- Seeded monster spawn (single pass). Choose any non-Room piece except the very first.
-		do
-			local monsterTemplates = ReplicatedStorage:FindFirstChild("MonsterTemplates")
-			if monsterTemplates then
-				-- collect valid pieces
-				local validPieces = {}
-				for _, piece in ipairs(mapLayout) do
-					if piece.type ~= "Room" then
-						table.insert(validPieces, piece)
-					end
-				end
-				if #mapLayout > 0 then
-					local firstPiece = mapLayout[1]
-					for i = #validPieces, 1, -1 do
-						if validPieces[i] == firstPiece then
-							table.remove(validPieces, i)
-						end
-					end
-				end
-
-				if #validPieces > 0 then
-					local chosenPiece = validPieces[randIndex(rng, #validPieces)]
-					local sizeInCells = Vector2.new(3, 3)
-
-					-- Find floor Y (if the piece model has a part named "Floor"/"Suelo")
-					local baseY = 0
-					if chosenPiece.model and chosenPiece.model:IsA("Model") then
-						for _, part in ipairs(chosenPiece.model:GetDescendants()) do
-							if part:IsA("BasePart") then
-								local lname = part.Name:lower()
-								if lname:find("floor") or lname:find("suelo") then
-									baseY = part.Position.Y + (part.Size.Y / 2)
-									break
-								end
-							end
-						end
-					end
-					if baseY == 0 then
-						baseY = config.construction.ALTURA_PISO or 1
-					end
-
-					local spawnPos = Vector3.new(
-						((chosenPiece.pos.c - 1) * sizeInCells.X + (sizeInCells.X / 2)) * config.construction.CELL_SIZE,
-						baseY + 3, -- small offset to avoid clipping
-						((chosenPiece.pos.r - 1) * sizeInCells.Y + (sizeInCells.Y / 2)) * config.construction.CELL_SIZE
-					)
-					local monsterTemplate = monsterTemplates:FindFirstChild("HallwayMonster")
-						or monsterTemplates:FindFirstChildOfClass("Model")
-					if monsterTemplate then
-						local monster = monsterTemplate:Clone()
-						monster.Name = ("Monster_%d"):format(rng:NextInteger(1000, 9999))
-						if not monster:GetAttribute("MonsterType") then
-							monster:SetAttribute("MonsterType", "Hallway")
-						end
-						monster:SetAttribute("MonsterAI", true) -- mark as map-spawned AI
-
-						local root = monster:FindFirstChild("HumanoidRootPart")
-							or monster.PrimaryPart
-							or monster:FindFirstChildWhichIsA("BasePart")
-
-						if root then
-							monster.Parent = Workspace
-							monster:SetPrimaryPartCFrame(CFrame.new(spawnPos + Vector3.new(0, 5, 0)))
-							print(("[MonsterAI] Spawned %s @ %s"):format(monster.Name, tostring(spawnPos)))
-						else
-							warn("[MonsterAI] No HumanoidRootPart/PrimaryPart found in monster template.")
-							monster:Destroy()
-						end
-					else
-						warn("[MonsterAI] No template under ReplicatedStorage/MonsterTemplates.")
-					end
-				else
-					warn("[MonsterAI] No valid piece found to spawn monster (not Room, not initial).")
-				end
-			else
-				warn("[MonsterAI] MonsterTemplates folder not found in ReplicatedStorage.")
-			end
-		end
+                -- Seeded monster spawn (single pass). Choose any non-Room piece except the very first.
+                spawnMonster(mapLayout, config)
 
 		-- Player start position = center of first piece
 		if #mapLayout > 0 then
