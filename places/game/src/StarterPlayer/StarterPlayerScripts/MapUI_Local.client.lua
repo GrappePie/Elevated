@@ -139,9 +139,10 @@ generateButton.MouseButton1Click:Connect(function()
 
 	-- Revisa la configuración del perfil para saber cómo actuar
 	local profileConfig = MapConfig[selectedProfile]
+	local seed = (profileConfig and profileConfig.generation and profileConfig.generation.seed) or Players.LocalPlayer.UserId
 
 	local success, result = pcall(function()
-		return generateEvent:InvokeServer(selectedProfile)
+		return generateEvent:InvokeServer(selectedProfile, seed)
 	end)
 
 	if success then

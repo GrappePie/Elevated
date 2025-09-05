@@ -1,6 +1,11 @@
 -- ModuleScript: MapGenerator (Versión con Perfiles)
 
+
 local MapGenerator = {}
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local SeededRng = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("combinedFunctions"):WaitForChild("SeededRng"))
+local RandomWeighted = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("combinedFunctions"):WaitForChild("RandomWeighted"))
 
 local NEIGH = {
 	N = {r = -1, c =  0, opp = "S"}, S = {r =  1, c =  0, opp = "N"},
@@ -40,9 +45,10 @@ local function getCompatibleTemplates(entryDir, themeConfig)
 	return compatible
 end
 
-function MapGenerator.generateLayout(config, themeConfig)
-	config = config or {}
-	local rows, cols, maxPieces = config.rows or 15, config.cols or 20, config.maxPieces or 40
+function MapGenerator.generateLayout(config, themeConfig, seed)
+        config = config or {}
+        local rng = SeededRng.new(seed)
+        local rows, cols, maxPieces = config.rows or 15, config.cols or 20, config.maxPieces or 40
 	local grid = {}
 	for r = 1, rows do grid[r] = {} for c = 1, cols do grid[r][c] = {isOccupied = false} end end
 
@@ -91,30 +97,30 @@ function MapGenerator.generateLayout(config, themeConfig)
 
 		themeConfig.generation.isApartmentWing = true
 	else
-		pieceCounter = 1
-		local startPos = {r = math.floor(rows / 2), c = math.floor(cols / 2)}
-		local startTemplateName = math.random() > 0.5 and "Room" or "Cross"
-		local startTemplateData = TEMPLATES[startTemplateName]
-		local recipe = {id = pieceCounter, name = startTemplateName, type = startTemplateData.type, pos = startPos, template = startTemplateData.template, doors = {}}
-		table.insert(pieces, recipe)
-		grid[startPos.r][startPos.c] = {isOccupied = true, pieceId = recipe.id}
-		pieceIdMap[recipe.id] = recipe
-		for dir, _ in pairs(startTemplateData.exits) do table.insert(openSockets, {originId = recipe.id, originPos = startPos, dir = dir}) end
-	end
+                pieceCounter = 1
+                local startPos = {r = math.floor(rows / 2), c = math.floor(cols / 2)}
+                local startTemplateName = RandomWeighted.pick({Room = 1, Cross = 1}, rng._random)
+                local startTemplateData = TEMPLATES[startTemplateName]
+                local recipe = {id = pieceCounter, name = startTemplateName, type = startTemplateData.type, pos = startPos, template = startTemplateData.template, doors = {}}
+                table.insert(pieces, recipe)
+                grid[startPos.r][startPos.c] = {isOccupied = true, pieceId = recipe.id}
+                pieceIdMap[recipe.id] = recipe
+                for dir, _ in pairs(startTemplateData.exits) do table.insert(openSockets, {originId = recipe.id, originPos = startPos, dir = dir}) end
+        end
 
-	while pieceCounter < maxPieces and #openSockets > 0 do
-		local socketIndex = math.random(#openSockets)
-		local currentSocket = table.remove(openSockets, socketIndex)
-		local oppositeDir = NEIGH[currentSocket.dir].opp
-		local compatible = getCompatibleTemplates(oppositeDir, themeConfig)
+        while pieceCounter < maxPieces and #openSockets > 0 do
+                local socketIndex = rng:nextInteger(1, #openSockets)
+                local currentSocket = table.remove(openSockets, socketIndex)
+                local oppositeDir = NEIGH[currentSocket.dir].opp
+                local compatible = getCompatibleTemplates(oppositeDir, themeConfig)
 
-		if #compatible > 0 then
-			local chosenTemplate = compatible[math.random(#compatible)]
-			local newPos = {r = currentSocket.originPos.r + NEIGH[currentSocket.dir].r, c = currentSocket.originPos.c + NEIGH[currentSocket.dir].c}
-			if newPos.r >= 1 and newPos.r <= rows and newPos.c >= 1 and newPos.c <= cols and not grid[newPos.r][newPos.c].isOccupied then
-				pieceCounter = pieceCounter + 1
-				local newRecipe = {id = pieceCounter, name = chosenTemplate.name, type = chosenTemplate.data.type, pos = newPos, template = chosenTemplate.data.template, doors = {}}
-				table.insert(pieces, newRecipe)
+                if #compatible > 0 then
+                        local chosenTemplate = compatible[rng:nextInteger(1, #compatible)]
+                        local newPos = {r = currentSocket.originPos.r + NEIGH[currentSocket.dir].r, c = currentSocket.originPos.c + NEIGH[currentSocket.dir].c}
+                        if newPos.r >= 1 and newPos.r <= rows and newPos.c >= 1 and newPos.c <= cols and not grid[newPos.r][newPos.c].isOccupied then
+                                pieceCounter = pieceCounter + 1
+                                local newRecipe = {id = pieceCounter, name = chosenTemplate.name, type = chosenTemplate.data.type, pos = newPos, template = chosenTemplate.data.template, doors = {}}
+                                table.insert(pieces, newRecipe)
 				grid[newPos.r][newPos.c] = {isOccupied = true, pieceId = newRecipe.id}
 				pieceIdMap[newRecipe.id] = newRecipe
 				if not (themeConfig.generation.isApartmentWing) then

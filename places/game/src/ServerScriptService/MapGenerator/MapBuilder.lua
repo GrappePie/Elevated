@@ -244,17 +244,17 @@ function MapBuilder.Generate(themeName: string, seed: number?)
 		startPosition = Vector3.new((CHUNK_SIZE / 2) * CELL_SIZE, 20, (CHUNK_SIZE / 2) * CELL_SIZE)
 	else
 		-- Preferred finite layout path
-		-- Try to pass rng (new signature). If MapGenerator doesn't accept it, retry without it.
+		-- Try to pass a seed (new signature). If MapGenerator doesn't accept it, retry without it.
 		local mapLayout, grid, pieceIdMap
-
+		
 		local ok = pcall(function()
 			mapLayout, grid, pieceIdMap =
-				MapGenerator.generateLayout({ rows = 20, cols = 20, maxPieces = 40 }, config, rng)
+			MapGenerator.generateLayout({ rows = 20, cols = 20, maxPieces = 40 }, config, floorSeed)
 		end)
 		if (not ok) or (type(mapLayout) ~= "table") then
 			-- Fallback to old signature
 			mapLayout, grid, pieceIdMap =
-				MapGenerator.generateLayout({ rows = 20, cols = 20, maxPieces = 40 }, config)
+			MapGenerator.generateLayout({ rows = 20, cols = 20, maxPieces = 40 }, config)
 		end
 
 		if not mapLayout or #mapLayout == 0 then

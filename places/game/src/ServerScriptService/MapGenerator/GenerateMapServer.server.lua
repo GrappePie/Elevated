@@ -32,12 +32,12 @@ end
 
 
 -- Función que se ejecuta cuando un cliente la invoca
-local function onGenerateRequest(player, themeName)
+local function onGenerateRequest(player, themeName, seed)
 	print("Petición recibida de", player.Name, "para generar el tema:", themeName)
 
 	-- Llama al MapBuilder para que haga todo el trabajo.
 	-- Ya no necesitamos controlar otros scripts desde aquí.
-	local startPosition = MapBuilder.Generate(themeName)
+	local startPosition = MapBuilder.Generate(themeName, seed)
 
 	if startPosition then
 		print("Mapa '"..themeName.."' generado. Posición de inicio:", startPosition)
