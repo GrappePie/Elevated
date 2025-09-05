@@ -1,0 +1,6 @@
+xpcall(function()
+	local lifts = require(script.Lifts)
+	local data = require(script.Parent.DataStore.DataController)
+end, function()
+	error()
+end)
