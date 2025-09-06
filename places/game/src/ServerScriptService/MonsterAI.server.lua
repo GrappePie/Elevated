@@ -259,7 +259,7 @@ local function chaseAndAttack(monster, target)
         if primary then
             local dist = (primary.Position - target.HumanoidRootPart.Position).Magnitude
             if dist < 4 then
-                local now = tick()
+                local now = os.clock()
                 if not MonsterAttackCooldown[monster] or now - MonsterAttackCooldown[monster] > 1.5 then
                     MonsterAttackCooldown[monster] = now
                     local targetHum = target:FindFirstChildOfClass("Humanoid")
@@ -325,7 +325,7 @@ local function setupMonsterAI(monsterModel)
 
     coroutine.wrap(function()
         while monsterModel.Parent do
-            local now = tick()
+            local now = os.clock()
             local seenPlayer = nil
             for _, player in ipairs(Players:GetPlayers()) do
                 local char = player.Character
