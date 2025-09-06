@@ -41,8 +41,28 @@ local playerGui = localPlayer:WaitForChild("PlayerGui")
 ----------------------------------------------------------------------
 local eventsFolder = ReplicatedStorage:FindFirstChild("Events")
 local function getRemote(name)
-	-- Search in ReplicatedStorage or ReplicatedStorage.Events
-	return ReplicatedStorage:FindFirstChild(name) or (eventsFolder and eventsFolder:FindFirstChild(name))
+        -- Search in ReplicatedStorage or ReplicatedStorage.Events
+        return ReplicatedStorage:FindFirstChild(name) or (eventsFolder and eventsFolder:FindFirstChild(name))
+end
+
+local function toFlagName(key: string): string
+	local flagName = key:gsub("_(%w)", function(s)
+		return s:upper()
+	end)
+	return flagName:sub(1,1):upper() .. flagName:sub(2)
+end
+
+local initialFlags: {[string]: boolean} = {}
+do
+	local getFlags = getRemote("GetDebugFlags")
+	if getFlags then
+		local ok, result = pcall(function()
+			return getFlags:InvokeServer()
+		end)
+		if ok and type(result) == "table" then
+			initialFlags = result
+		end
+	end
 end
 
 ----------------------------------------------------------------------
@@ -398,7 +418,11 @@ do
 			addSection(def.section)
 			lastSection = def.section
 		end
-		addSwitchRow(def.section, def.label, def.tooltip, def.default, function(enabled)
+		local initial = def.default
+		if def.type == "remote" then
+			initial = initialFlags[toFlagName(def.key)] or def.default
+		end
+		addSwitchRow(def.section, def.label, def.tooltip, initial, function(enabled)
 			if def.type == "direct" then
 				fireDirect(def.remoteName, enabled)
 			else
