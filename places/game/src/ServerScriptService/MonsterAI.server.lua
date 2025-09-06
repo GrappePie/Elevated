@@ -228,11 +228,43 @@ local function patrol(monster)
         WaypointSpacing = 4,
         Costs = {},
     })
+    local MOVE_TIMEOUT = 5
+    local function followPath(pathObj)
+        for _, waypoint in ipairs(pathObj:GetWaypoints()) do
+            humanoid:MoveTo(waypoint.Position)
+            local reached = false
+            local conn
+            conn = humanoid.MoveToFinished:Connect(function()
+                reached = true
+            end)
+            local start = os.clock()
+            while not reached and os.clock() - start <= MOVE_TIMEOUT do
+                if (monster.PrimaryPart.Position - waypoint.Position).Magnitude <= 2 then
+                    reached = true
+                    break
+                end
+                task.wait()
+            end
+            conn:Disconnect()
+            if not reached then
+                return false
+            end
+        end
+        return true
+    end
+
     path:ComputeAsync(monster.PrimaryPart.Position, nextPoint.Position)
     if path.Status == Enum.PathStatus.Complete then
-        for _, waypoint in ipairs(path:GetWaypoints()) do
-            humanoid:MoveTo(waypoint.Position)
-            humanoid.MoveToFinished:Wait()
+        if not followPath(path) then
+            warn("[MonsterAI] Patrol move timed out; recalculating path.")
+            path:ComputeAsync(monster.PrimaryPart.Position, nextPoint.Position)
+            if path.Status == Enum.PathStatus.Complete then
+                if not followPath(path) then
+                    warn("[MonsterAI] Patrol move timed out again; skipping point.")
+                end
+            else
+                warn("[MonsterAI] Pathfinding failed after timeout; skipping point.")
+            end
         end
     else
         warn("[MonsterAI] Pathfinding failed for patrol.")
