@@ -45,13 +45,23 @@ end
 local flagMaids = {}
 
 local function ensureRemote(name)
-	local ev = ReplicatedStorage:FindFirstChild(name)
-	if not ev then
-		ev = Instance.new("RemoteEvent")
-		ev.Name = name
-		ev.Parent = ReplicatedStorage
+        local ev = ReplicatedStorage:FindFirstChild(name)
+        if not ev then
+                ev = Instance.new("RemoteEvent")
+                ev.Name = name
+                ev.Parent = ReplicatedStorage
+        end
+        return ev
+end
+
+local function ensureRemoteFunction(name: string)
+	local fn = ReplicatedStorage:FindFirstChild(name)
+	if not fn then
+		fn = Instance.new("RemoteFunction")
+		fn.Name = name
+		fn.Parent = ReplicatedStorage
 	end
-	return ev
+	return fn :: RemoteFunction
 end
 
 -- Dedicated event already used by monsters (client will call this)
@@ -104,6 +114,25 @@ debugToggleEvent.OnServerEvent:Connect(function(player, key, enabled)
         end
         updateFlag(tostring(key), not not enabled)
 end)
+
+local getFlagsFunction = ensureRemoteFunction("GetDebugFlags")
+
+local function gatherFlags(): {[string]: boolean}
+	local out: {[string]: boolean} = {}
+	for _, flag in flagsFolder:GetChildren() do
+		if flag:IsA("BoolValue") then
+			out[flag.Name] = flag.Value
+		end
+	end
+	return out
+end
+
+getFlagsFunction.OnServerInvoke = function(player: Player): {[string]: boolean}
+	if not isAuthorized(player) then
+		return {}
+	end
+	return gatherFlags()
+end
 
 -- Example: forward MonsterDebugEvent to your AI system
 local monsterEvent = ensureRemote("MonsterDebugEvent")
