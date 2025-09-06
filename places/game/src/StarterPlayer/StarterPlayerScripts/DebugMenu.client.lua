@@ -97,10 +97,11 @@ local HOTKEY_TOGGLE_MENU = Enum.KeyCode.F3
 -- type="direct": fires a specific RemoteEvent by name (e.g., MonsterDebugEvent)
 -- type="remote": fires DebugToggleEvent with a 'key'
 local TOGGLES = {
-	{ section="Monsters", label="Vision Cones", type="direct", remoteName="MonsterDebugEvent", default=false, tooltip="Show/hide monster vision cones." },
-	{ section="Elevator", label="Show Sensors", type="remote", key="elevator_sensors",       default=false, tooltip="Paint doorway & cabin sensors (server-side)." },
-	{ section="Elevator", label="Music",         type="remote", key="elevator_music",         default=true,  tooltip="Enable/disable elevator music logic." },
-	{ section="AI",       label="Nav Paths",     type="remote", key="ai_paths",               default=false, tooltip="Show AI navigation/path debug." },
+        { section="Monsters", label="Vision Cones", type="direct", remoteName="MonsterDebugEvent", default=false, tooltip="Show/hide monster vision cones." },
+        { section="Elevator", label="Show Sensors", type="remote", key="elevator_sensors",       default=false, tooltip="Paint doorway & cabin sensors (server-side)." },
+        { section="Elevator", label="Music",         type="remote", key="elevator_music",         default=true,  tooltip="Enable/disable elevator music logic." },
+        { section="AI",       label="Nav Paths",     type="remote", key="ai_paths",               default=false, tooltip="Show AI navigation/path debug." },
+        { section="Players",  label="Player Colliders", type="remote", key="player_colliders",    default=false, tooltip="Show player collision boxes." },
 }
 
 ----------------------------------------------------------------------
