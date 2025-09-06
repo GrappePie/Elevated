@@ -42,6 +42,10 @@ local RUN_SPEED = 45
 local BASIC_FOV = 70
 local RUN_FOV = 90
 
+local crouch = false
+local crouchMoving = false
+local lastCrouchKey = nil
+
 ---Methods---
 
 local function check(type)
