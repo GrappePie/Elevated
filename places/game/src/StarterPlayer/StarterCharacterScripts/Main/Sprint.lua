@@ -20,6 +20,11 @@ local humanoid: Humanoid = char:WaitForChild("Humanoid")
 local animator: Animator = humanoid:WaitForChild("Animator")
 local camera = workspace.CurrentCamera
 
+-- Cache original dimensions so we can restore after crouch/slide
+local defaultHipHeight = humanoid.HipHeight
+local defaultHrpSize = hrp.Size
+-- These properties replicate to the server, keeping server checks in sync
+
 -- RemoteEvent (server creates it)
 local SprintEvent = ReplicatedStorage:FindFirstChild("PlayerSprintEvent") or ReplicatedStorage:WaitForChild("PlayerSprintEvent", 5)
 if not SprintEvent then
@@ -146,36 +151,42 @@ fnTab["LeftShift"] = function(state: boolean)
 end
 
 fnTab["C"] = function(state: boolean)
-	if state then
-		-- Start crouch or slide
-		if hrp.AssemblyLinearVelocity.Magnitude < 1 then
-			crouchAnim:looping(true)
-			crouchAnim:Play(0.2)
-			crouch = true
-			smoothSpeed(SLOW_SPEED, 0.18)
-			return
-		end
-		-- Sliding while moving
-		slideAnim:looping(true)
-		slideAnim:Play(0.14)
-		smoothSpeed(SLIDE_SPEED, 0.14)
-		return
-	end
+        if state then
+                -- Reduce size to allow passing under low obstacles
+                humanoid.HipHeight = 1
+                hrp.Size = Vector3.new(defaultHrpSize.X, math.max(1, defaultHrpSize.Y * 0.5), defaultHrpSize.Z)
 
-	-- === RELEASE C ===
-	-- 1) Mark as NOT crouching first so no new MovingCrouch can start this frame
-	crouch = false
+                -- Start crouch or slide
+                if hrp.AssemblyLinearVelocity.Magnitude < 1 then
+                        crouchAnim:looping(true)
+                        crouchAnim:Play(0.2)
+                        crouch = true
+                        smoothSpeed(SLOW_SPEED, 0.18)
+                        return
+                end
+                -- Sliding while moving
+                slideAnim:looping(true)
+                slideAnim:Play(0.14)
+                smoothSpeed(SLIDE_SPEED, 0.14)
+                return
+        end
+
+        -- === RELEASE C ===
+        -- 1) Mark as NOT crouching first so no new MovingCrouch can start this frame
+        crouch = false
 
 	-- 2) Explicitly tell MovingCrouch to stop (handles flags & speed)
 	pcall(function()
 		if fnTab and fnTab["MovingCrouch"] then fnTab["MovingCrouch"](false) end
 	end)
 
-	-- 3) Hard-stop any crouch/slide tracks that might still be latched
-	stopCrouchTracks()
+        -- 3) Hard-stop any crouch/slide tracks that might still be latched
+        stopCrouchTracks()
 
-	-- 4) Restore default move & FOV
-	smoothSpeedAndFOV(BASIC_SPEED, BASIC_FOV, 0.18)
+        -- 4) Restore default move & FOV
+        humanoid.HipHeight = defaultHipHeight
+        hrp.Size = defaultHrpSize
+        smoothSpeedAndFOV(BASIC_SPEED, BASIC_FOV, 0.18)
 end
 
 fnTab["MovingCrouch"] = function(state: boolean)
