@@ -82,21 +82,25 @@ local function playMonsterAnimation(monster, animType)
     if not monster or not monster.Parent then return end
     local humanoid = monster:FindFirstChildOfClass("Humanoid")
     if not humanoid then return end
-    if not MonsterAnimState[monster] then MonsterAnimState[monster] = {} end
+    if not MonsterAnimState[monster] then MonsterAnimState[monster] = { tracks = {} } end
     local state = MonsterAnimState[monster]
+    local tracks = state.tracks
     if state.currentTrack and state.currentType ~= animType then
         state.currentTrack:Stop(0.1)
-        state.currentTrack = nil
     end
     if state.currentType ~= animType then
-        local anim = Instance.new("Animation")
-        anim.Name = "_monster_anim"
-        anim.AnimationId = ANIMATIONS[animType] or ANIMATIONS.Idle
-        local track = humanoid:LoadAnimation(anim)
+        local track = tracks[animType]
+        if not track then
+            local anim = Instance.new("Animation")
+            anim.Name = "_monster_anim"
+            anim.AnimationId = ANIMATIONS[animType] or ANIMATIONS.Idle
+            track = humanoid:LoadAnimation(anim)
+            tracks[animType] = track
+            Debris:AddItem(anim, 2)
+        end
         track:Play(0.1)
         state.currentTrack = track
         state.currentType = animType
-        Debris:AddItem(anim, 2)
     end
 end
 
@@ -332,6 +336,15 @@ local function setupMonsterAI(monsterModel)
     local mTypeName = monsterModel:GetAttribute("MonsterType") or "Hallway"
     local mType = MONSTER_TYPES[mTypeName] or MONSTER_TYPES.Hallway
     MonsterType[monsterModel] = mType
+    monsterModel.Destroying:Connect(function()
+        local state = MonsterAnimState[monsterModel]
+        if state and state.tracks then
+            for _, track in pairs(state.tracks) do
+                pcall(function() track:Destroy() end)
+            end
+        end
+        MonsterAnimState[monsterModel] = nil
+    end)
     print("[MonsterAI] Setting up AI for monster: " .. monsterModel.Name .. " (type: " .. mType.name .. ")")
     setIdle(monsterModel)
     if not monsterModel.PrimaryPart then
