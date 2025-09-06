@@ -1,7 +1,27 @@
 -- Creates RemoteEvents in ReplicatedStorage if missing.
--- Routes generic DebugToggleEvent(key, enabled) to prints or to other systems.
+-- Routes generic DebugToggleEvent(key, enabled) to flags and debug events.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Maid = require(ReplicatedStorage.Modules.combinedFunctions.Maid)
+
+local DEBUG_FLAGS_FOLDER = "DebugFlags"
+local DEBUG_EVENTS_FOLDER = "DebugEvents"
+
+local flagsFolder = ReplicatedStorage:FindFirstChild(DEBUG_FLAGS_FOLDER)
+if not flagsFolder then
+        flagsFolder = Instance.new("Folder")
+        flagsFolder.Name = DEBUG_FLAGS_FOLDER
+        flagsFolder.Parent = ReplicatedStorage
+end
+
+local eventsFolder = ReplicatedStorage:FindFirstChild(DEBUG_EVENTS_FOLDER)
+if not eventsFolder then
+        eventsFolder = Instance.new("Folder")
+        eventsFolder.Name = DEBUG_EVENTS_FOLDER
+        eventsFolder.Parent = ReplicatedStorage
+end
+
+local flagMaids = {}
 
 local function ensureRemote(name)
 	local ev = ReplicatedStorage:FindFirstChild(name)
@@ -19,28 +39,51 @@ ensureRemote("MonsterDebugEvent")
 -- Generic key-based toggles
 local debugToggleEvent = ensureRemote("DebugToggleEvent")
 
--- Example: React to generic toggles here (print/log or forward to systems)
-debugToggleEvent.OnServerEvent:Connect(function(player, key, enabled)
-	print(("[DebugToggle] %s set '%s' = %s"):format(player.Name, tostring(key), tostring(enabled)))
+local function toFlagName(key: string)
+        local flagName = key:gsub("_(%w)", function(s)
+                return s:upper()
+        end)
+        return flagName:sub(1,1):upper() .. flagName:sub(2)
+end
 
-	-- TODO: route to your systems. Examples:
-	--  if key == "elevator_sensors" then
-	--      -- Set a global BoolValue that your Elevator script reads periodically:
-	--      local flagsFolder = ReplicatedStorage:FindFirstChild("DebugFlags") or Instance.new("Folder", ReplicatedStorage)
-	--      flagsFolder.Name = "DebugFlags"
-	--      local flag = flagsFolder:FindFirstChild("ElevatorSensors") or Instance.new("BoolValue", flagsFolder)
-	--      flag.Name = "ElevatorSensors"
-	--      flag.Value = enabled
-	--  elseif key == "elevator_music" then
-	--      -- Same approach; your Elevator script can listen to .Changed on the BoolValue
-	--  elseif key == "ai_paths" then
-	--      -- Broadcast to your AI manager via BindableEvent, etc.
-	--  end
+local function updateFlag(key: string, enabled: boolean)
+        local flagName = toFlagName(key)
+
+        local flag = flagsFolder:FindFirstChild(flagName)
+        if not flag then
+                flag = Instance.new("BoolValue")
+                flag.Name = flagName
+                flag.Parent = flagsFolder
+        end
+        flag.Value = enabled
+
+        local event = eventsFolder:FindFirstChild(flagName)
+        if not event then
+                event = Instance.new("BindableEvent")
+                event.Name = flagName
+                event.Parent = eventsFolder
+        end
+        event:Fire(enabled)
+
+        local maid = flagMaids[flagName]
+        if maid then
+                maid:EndAllTasks()
+        else
+                maid = Maid.new()
+                flagMaids[flagName] = maid
+        end
+        maid:GiveSignal(flag.Changed, function(value)
+                event:Fire(value)
+        end)
+end
+
+debugToggleEvent.OnServerEvent:Connect(function(_player, key, enabled)
+        updateFlag(tostring(key), not not enabled)
 end)
 
 -- Example: forward MonsterDebugEvent to your AI system
 local monsterEvent = ensureRemote("MonsterDebugEvent")
 monsterEvent.OnServerEvent:Connect(function(player, enabled)
-	print(("[MonsterDebug] %s set VisionCones = %s"):format(player.Name, tostring(enabled)))
-	-- TODO: forward to your monster system (BindableEvent, module, etc.)
+        print(("[MonsterDebug] %s set VisionCones = %s"):format(player.Name, tostring(enabled)))
+        -- TODO: forward to your monster system (BindableEvent, module, etc.)
 end)
