@@ -8,6 +8,32 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 
 local localPlayer = Players.LocalPlayer
+
+local ALLOWED_USER_IDS: {[number]: boolean} = {
+	[1649598894] = true,
+	[1021056267] = true,
+	[3454147180] = true,
+}
+
+local ALLOWED_ROLES: {[string]: boolean} = {
+	Developer = true,
+}
+
+local function isAuthorized(player: Player): boolean
+	if ALLOWED_USER_IDS[player.UserId] then
+	        return true
+	end
+	local role = player:GetAttribute("Role")
+	if role and ALLOWED_ROLES[role] then
+	        return true
+	end
+	return false
+end
+
+if not isAuthorized(localPlayer) then
+	return
+end
+
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 
 ----------------------------------------------------------------------
