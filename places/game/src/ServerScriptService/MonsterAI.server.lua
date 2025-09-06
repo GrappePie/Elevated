@@ -383,7 +383,7 @@ local function setupMonsterAI(monsterModel)
                     updateVisionConeColor(monsterModel, false)
                 end
             end
-            wait(0.12)
+            RunService.Heartbeat:Wait()
         end
     end)()
 end
