@@ -77,6 +77,56 @@ local MONSTER_TYPES = {
     -- Add more types here
 }
 
+-- Clean up all monster state and resources
+local function cleanupMonster(monsterModel)
+    if not monsterModel then
+        return
+    end
+
+    -- Remove from controller map
+    MonsterAIControllers[monsterModel.Name] = nil
+
+    -- Stop and destroy any animation tracks
+    local state = MonsterAnimState[monsterModel]
+    if state and state.tracks then
+        for _, track in pairs(state.tracks) do
+            pcall(function()
+                track:Destroy()
+            end)
+        end
+    end
+
+    -- Stop and remove lingering sounds
+    for _, obj in ipairs(monsterModel:GetDescendants()) do
+        if obj:IsA("Sound") then
+            pcall(function()
+                obj:Stop()
+                obj:Destroy()
+            end)
+        end
+    end
+
+    -- Remove vision cone adornment if present
+    local head = monsterModel:FindFirstChild("Head")
+    if head then
+        local cone = head:FindFirstChild("VisionCone")
+        if cone then
+            cone:Destroy()
+        end
+    end
+
+    -- Clear state tables
+    MonsterAnimState[monsterModel] = nil
+    MonsterAttackCooldown[monsterModel] = nil
+    MonsterNoticeState[monsterModel] = nil
+    MonsterState[monsterModel] = nil
+    MonsterTarget[monsterModel] = nil
+    MonsterLastSeen[monsterModel] = nil
+    MonsterPatrolPoints[monsterModel] = nil
+    MonsterPatrolIndex[monsterModel] = nil
+    MonsterType[monsterModel] = nil
+end
+
 -- === UTIL / ANIMATIONS ===
 local function playMonsterAnimation(monster, animType)
     if not monster or not monster.Parent then return end
@@ -336,15 +386,6 @@ local function setupMonsterAI(monsterModel)
     local mTypeName = monsterModel:GetAttribute("MonsterType") or "Hallway"
     local mType = MONSTER_TYPES[mTypeName] or MONSTER_TYPES.Hallway
     MonsterType[monsterModel] = mType
-    monsterModel.Destroying:Connect(function()
-        local state = MonsterAnimState[monsterModel]
-        if state and state.tracks then
-            for _, track in pairs(state.tracks) do
-                pcall(function() track:Destroy() end)
-            end
-        end
-        MonsterAnimState[monsterModel] = nil
-    end)
     print("[MonsterAI] Setting up AI for monster: " .. monsterModel.Name .. " (type: " .. mType.name .. ")")
     setIdle(monsterModel)
     if not monsterModel.PrimaryPart then
@@ -367,6 +408,22 @@ local function setupMonsterAI(monsterModel)
     MonsterState[monsterModel] = "idle"
     MonsterTarget[monsterModel] = nil
     MonsterLastSeen[monsterModel] = 0
+
+    local cleaned = false
+    local function cleanup()
+        if cleaned then
+            return
+        end
+        cleaned = true
+        cleanupMonster(monsterModel)
+    end
+
+    monsterModel.AncestryChanged:Connect(function(_, parent)
+        if parent == nil then
+            cleanup()
+        end
+    end)
+    monsterModel.Destroying:Connect(cleanup)
 
     coroutine.wrap(function()
         while monsterModel.Parent do
